@@ -16,12 +16,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /**
- * 取得高雄天氣預報
+ * 取得指定城市天氣預報
  * CWA 氣象資料開放平臺 API
  * 使用「一般天氣預報-今明 36 小時天氣預報」資料集
  */
-const getKaohsiungWeather = async (req, res) => {
+const getCityWeather = async (req, res) => {
   try {
+    // 從路由參數或查詢參數獲取城市名稱
+    const cityName = req.params.city || req.query.city || "臺北市";
+
     // 檢查是否有設定 API Key
     if (!CWA_API_KEY) {
       return res.status(500).json({
@@ -37,20 +40,36 @@ const getKaohsiungWeather = async (req, res) => {
       {
         params: {
           Authorization: CWA_API_KEY,
-          locationName: "臺北市",
+          locationName: cityName,
         },
       }
     );
 
-    // 取得高雄市的天氣資料
+    // 檢查 API 回應結構
+    console.log('API 回應狀態:', response.status);
+    console.log('查詢城市:', cityName);
+
+    // 檢查必要的資料結構
+    if (!response.data || !response.data.records || !response.data.records.location) {
+      console.error('API 回應結構異常:', JSON.stringify(response.data, null, 2));
+      return res.status(500).json({
+        error: "API 回應格式錯誤",
+        message: "CWA API 回應的資料格式不符合預期",
+      });
+    }
+
+    // 取得指定城市的天氣資料
     const locationData = response.data.records.location[0];
 
     if (!locationData) {
+      console.error('找不到城市資料:', cityName);
       return res.status(404).json({
         error: "查無資料",
-        message: "無法取得臺北市天氣資料",
+        message: `無法取得${cityName}天氣資料，請確認城市名稱正確`,
       });
     }
+
+    console.log('成功取得天氣資料:', locationData.locationName);
 
     // 整理天氣資料
     const weatherData = {
@@ -131,9 +150,17 @@ app.get("/", (req, res) => {
   res.json({
     message: "歡迎使用 CWA 天氣預報 API",
     endpoints: {
+      allCities: "/api/weather/:city (例如: /api/weather/臺北市)",
+      taipei: "/api/weather/taipei",
       kaohsiung: "/api/weather/kaohsiung",
       health: "/api/health",
     },
+    availableCities: [
+      "臺北市", "新北市", "桃園市", "臺中市", "臺南市", "高雄市",
+      "基隆市", "新竹市", "嘉義市", "新竹縣", "苗栗縣", "彰化縣",
+      "南投縣", "雲林縣", "嘉義縣", "屏東縣", "宜蘭縣", "花蓮縣",
+      "臺東縣", "澎湖縣", "金門縣", "連江縣"
+    ]
   });
 });
 
@@ -141,8 +168,8 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
-// 取得高雄天氣預報
-app.get("/api/weather/kaohsiung", getKaohsiungWeather);
+// 取得指定城市天氣預報 (動態路由)
+app.get("/api/weather/:city", getCityWeather);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
