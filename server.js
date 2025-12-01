@@ -33,6 +33,9 @@ const getCityWeather = async (req, res) => {
       });
     }
 
+    // 添加小延遲避免觸發 WAF (特別是首次請求)
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // 呼叫 CWA API - 一般天氣預報（36小時）
     // API 文件: https://opendata.cwa.gov.tw/dist/opendata-swagger.html
     const response = await axios.get(
@@ -42,6 +45,12 @@ const getCityWeather = async (req, res) => {
           Authorization: CWA_API_KEY,
           locationName: cityName,
         },
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+          'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
+        },
+        timeout: 10000, // 10 秒超時
       }
     );
 
